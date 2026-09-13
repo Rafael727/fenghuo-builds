@@ -96,7 +96,7 @@ footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 12
   </div>
   <div class="wrap" style="padding-top:.75rem;padding-bottom:0">
     <div class="chips" id="cats"></div>
-    <div class="chips" id="tiers"></div>
+    <div class="chips" id="tiers"></div><div class="chips" id="ranks" aria-label="武器梯度"></div><p class="meta">梯度按已有 S10 资料简化：原 T0.5 归入 T0，T1 上下统一为 T1；不代表当前赛季实测强度。未评级武器在全部梯度中展示。</p>
   </div>
   <div class="wrap">
     <p class="meta" id="count"></p>
@@ -125,9 +125,10 @@ const CAT_SHORT = {"突击／战斗步枪":"突击步枪","冲锋枪":"冲锋枪
 const TIERS = [{id:"机密",hint:"30万内"},{id:"中档",hint:"30–50万"},{id:"绝密",hint:"50万+"},{id:"待判断",hint:"价格未知"}];
 const TONE = {机密:"teal",中档:"",绝密:"secret",待判断:""};
 
-const state = { q:"", category:"", tier:"", favOnly:false, fav: new Set(JSON.parse(localStorage.getItem("fh-off-fav")||"[]")) };
+const state = { q:"", category:"", tier:"", rank:"", favOnly:false, fav: new Set(JSON.parse(localStorage.getItem("fh-off-fav")||"[]")) };
 function saveFav(){ localStorage.setItem("fh-off-fav", JSON.stringify([...state.fav])); }
 
+function rankOf(g){ return g.rating ? (g.rating.level < 1 ? "T0" : "T1") : ""; }
 function rel(p){ return (p||"").replace(/^\//,""); }
 function norm(s){ return String(s||"").toUpperCase().replace(/[\s\-_/·]/g,""); }
 function featured(builds){
@@ -159,6 +160,7 @@ function filtered(){
   for (const g of GUNS) {
     if (state.favOnly && !state.fav.has(g.id)) continue;
     if (state.category && g.category !== state.category) continue;
+    if (state.rank && rankOf(g) !== state.rank) continue;
     const shown = g.builds.filter(b => !state.tier || b.tier === state.tier);
     if (!shown.length) continue;
     if (term) {
@@ -182,6 +184,9 @@ function renderChips(){
   const cats = document.getElementById("cats"); cats.replaceChildren();
   cats.append(chip("全部枪种", !state.category, ()=>{ state.category=""; render(); }));
   CATS.forEach(c => cats.append(chip(CAT_SHORT[c]||c, state.category===c, ()=>{ state.category = state.category===c?"":c; render(); })));
+  const ranks = document.getElementById("ranks"); ranks.replaceChildren();
+  ranks.append(chip("全部梯度", !state.rank, ()=>{ state.rank=""; render(); }));
+  ["T0","T1"].forEach(r => ranks.append(chip(r, state.rank===r, ()=>{ state.rank=state.rank===r?"":r; render(); })));
   const tiers = document.getElementById("tiers"); tiers.replaceChildren();
   TIERS.forEach(t => tiers.append(chip(t.id+" "+t.hint, state.tier===t.id, ()=>{ state.tier = state.tier===t.id?"":t.id; render(); })));
   tiers.append(chip("收藏 "+(state.fav.size||""), state.favOnly, ()=>{ state.favOnly=!state.favOnly; render(); }));
@@ -211,7 +216,7 @@ function renderGrid(){
           <button class="star ${state.fav.has(g.id)?"on":""}" type="button" data-fav="${g.id}" aria-label="收藏">${state.fav.has(g.id)?"★":"☆"}</button>
         </div>
         <div style="margin-top:.4rem;display:flex;gap:.35rem;flex-wrap:wrap">
-          ${g.rating?`<span class="badge secret">${g.rating.label} · ${g.rating.season}</span>`:""}
+          ${g.rating?`<span class="badge secret">${rankOf(g)} · ${g.rating.season}</span>`:""}
           <span class="badge">${priceLabel(g.shown)}</span>
         </div>
         <p style="margin:.7rem 0 0">${f.tag}</p>
@@ -243,7 +248,7 @@ function openGun(id){
         <div><span>操控速度</span><strong>${g.base?.handling ?? "待核实"}</strong></div>
         <div><span>后坐控制</span><strong>${g.base?.recoil ?? "待核实"}</strong></div>
       </div>
-      ${g.rating?`<p class="badge secret">${g.rating.label} · ${g.rating.season}</p><p class="meta">${g.rating.condition}</p>`:`<p class="meta">武器梯度：待核实</p>`}
+      ${g.rating?`<p class="badge secret">${rankOf(g)} · ${g.rating.season}</p><p class="meta">原评级 ${g.rating.label} · ${g.rating.condition} <a href="${g.rating.source}" target="_blank" rel="noopener noreferrer">评级来源（${g.rating.date}）</a></p>`:`<p class="meta">武器梯度：待核实</p>`}
       ${rows.map(b=>`
         <div class="build">
           <span class="badge ${TONE[b.tier]||""}">${b.tier}</span>
@@ -261,7 +266,7 @@ document.getElementById("hero-lead").textContent =
   GUNS.length+" 种武器 · "+GUNS.reduce((n,g)=>n+g.builds.length,0)+" 套社区改枪码。支持搜索、复制与本机收藏。";
 
 document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; render(); });
-document.getElementById("reset").onclick = () => { state.q=""; state.category=""; state.tier=""; state.favOnly=false; document.getElementById("q").value=""; render(); };
+document.getElementById("reset").onclick = () => { state.q=""; state.category=""; state.tier=""; state.rank=""; state.favOnly=false; document.getElementById("q").value=""; render(); };
 document.body.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-open],[data-copy],[data-fav]");
   if (!t) return;
